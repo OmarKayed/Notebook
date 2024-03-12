@@ -8,7 +8,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { useCollection} from 'react-firebase-hooks/firestore'
 import * as ImagePicker from 'expo-image-picker'
 import { storage } from './firebase';
-import { ref, uploadBytes, getDownloadURL} from 'firebase/storage'
+import { ref, uploadBytes, getDownloadURL, deleteObject} from 'firebase/storage'
 
 const Stack = createNativeStackNavigator();
 
@@ -137,6 +137,63 @@ const DetailPage = ({ navigation, route }) => {
   })
 }
 
+async function launchCamera() {
+  try {
+    const result = await ImagePicker.requestCameraPermissionsAsync();
+    if (result.granted === false) {
+      alert("Du skal give adgang til kameraet for at kunne tage billeder");
+      return;
+    }
+
+    const response = await ImagePicker.launchCameraAsync({
+      quality: 1,
+    });
+
+    if (!response.canceled) {
+      setImagePath(response.assets[0].uri);
+    }
+  } catch (error) {
+    console.error("Fejl ved kameraet:", error);
+    alert("Der opstod en fejl ved kameraet");
+  }
+}
+
+async function savePicture() {
+  try {
+    const res = await fetch(imagePath);
+    const blob = await res.blob();
+    
+    const storageRef = ref(storage, "IMG_6031.png");
+    const uploadTaskSnapshot = await uploadBytes(storageRef, blob);
+    const imageUrl = await getDownloadURL(uploadTaskSnapshot.ref);
+    
+    // Gem tekst og billedets URL i Firestore
+    await addDoc(collection(database, "notes"), {
+      text: fullText,
+      imageUrl: imageUrl,
+    });
+    
+    console.log("Data blev gemt i Firebase");
+  } catch (error) {
+    console.error("Fejl ved gemning af data:", error);
+  }
+}
+
+async function deletePicture() {
+  try {
+    const storageRef = ref(storage, "IMG_6031.png");
+    await deleteObject(storageRef);
+
+    setImagePath(null);
+    
+    console.log("Billedet blev slettet fra Firebase");
+  } catch (error) {
+    console.error("Fejl ved sletning af billedet fra Firebase", error);
+  }
+}
+
+  
+
   return (
     <View style={styles.container}>
       <Text>{fullText}</Text>
@@ -144,6 +201,9 @@ const DetailPage = ({ navigation, route }) => {
       <Button title="get Picture" onPress={getPicture} />
       <Button title="Upload Picture" onPress={uploadPicture} />
       <Button title="Download Picture" onPress={downloadPicture} />
+      <Button title="Launch Camera" onPress={launchCamera} />
+      <Button title="Save Picture" onPress={savePicture} />
+      <Button title="Delete Picture" onPress={deletePicture} />
     </View>
   );
 };
